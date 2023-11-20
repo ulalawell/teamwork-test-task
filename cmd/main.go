@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+
 	"teamwork-test-task/internal/customerimporter"
 )
 
