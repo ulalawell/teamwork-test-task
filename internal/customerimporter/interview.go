@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // customerImporter represents a CSV file importer for customer data.
@@ -68,40 +69,68 @@ func (importer *customerImporter) GetDomainCounts() ([]emailDomain, error) {
 		return nil, fmt.Errorf("failed to read the headers row from the CSV file: %w", err)
 	}
 
-	//Find index of column with email name
 	emailIndex := indexOf(fileHeaders, importer.emailFieldName)
 	if emailIndex == -1 {
 		return nil, fmt.Errorf("failed to find the field '%s' in the headers", importer.emailFieldName)
 	}
 
-	for {
-		record, err := reader.Read()
+	//mutex := sync.Mutex{}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	emailAddresses := make(chan string)
 
-		// Break the loop if we reach the end of the file
-		if err == io.EOF {
-			break
+	go func() {
+		wg.Add(1)
+
+		for {
+			record, err := reader.Read()
+
+			// Break the loop if we reach the end of the file
+			if err == io.EOF {
+				wg.Done()
+				close(emailAddresses)
+
+				break
+			}
+
+			// Handle other errors
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			email := record[emailIndex]
+			if !isValidEmail(email) {
+				log.Printf("invalid email address found in row %v, skipping", record)
+				continue
+			}
+
+			emailAddresses <- email
 		}
 
-		// Handle other errors
-		if err != nil {
-			log.Printf("error: %s while reading line: %s", err, record)
-			continue
-		}
+		wg.Done()
+	}()
 
-		email := record[emailIndex]
-		if !isValidEmail(email) {
-			log.Printf("invalid email address found in row %v, skipping", record)
-			continue
-		}
+	//for i := 0; i < 4; i++ {
+	go func() {
+		wg.Add(1)
 
-		domain, err := extractEmailDomain(email)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+		for address := range emailAddresses {
+			domain, err := extractEmailDomain(address)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 
-		emailDomainCounts[domain]++
-	}
+			//mutex.Lock()
+			emailDomainCounts[domain]++
+			//mutex.Unlock()
+		}
+		wg.Done()
+	}()
+	//}
+
+	wg.Wait()
 
 	sortedDomains := sortEmailDomainsByCount(emailDomainCounts)
 
