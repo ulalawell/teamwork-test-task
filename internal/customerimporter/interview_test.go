@@ -2,6 +2,7 @@ package customerimporter
 
 import (
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -24,7 +25,7 @@ func TestNewCustomerImporter(t *testing.T) {
 	}
 
 	// Test empty email field name
-	_, err = NewCustomerImporter("example.csv", "")
+	_, err = NewCustomerImporter("customers_test.csv", "")
 	if err == nil {
 		t.Error("Expected error for empty email field name, got nil")
 	}
@@ -202,6 +203,44 @@ func TestGetDomainInformation(t *testing.T) {
 	}
 	if !isEqual(domainInfo, expected) {
 		t.Errorf("Expected %v, got %v", expected, domainInfo)
+	}
+}
+
+func TestSortEmailDomainsByCount(t *testing.T) {
+	// Test case with unsorted map of email domains and customer counts
+	unsortedMap := map[string]int{
+		"domain1.com": 3,
+		"domain2.com": 1,
+		"domain3.com": 5,
+		"domain4.com": 2,
+	}
+
+	// Expected result after sorting by customer count in descending order
+	expectedResult := []emailDomain{
+		{"domain3.com", 5},
+		{"domain1.com", 3},
+		{"domain4.com", 2},
+		{"domain2.com", 1},
+	}
+
+	// Call the function to be tested
+	result := sortEmailDomainsByCount(unsortedMap)
+
+	// Compare the result with the expected result
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("SortEmailDomainsByCount result is incorrect. Got: %v, Expected: %v", result, expectedResult)
+	}
+}
+
+func TestExtractEmailDomainError(t *testing.T) {
+	// Test case with an invalid email address
+	invalidEmail := "invalid.email.domain.com"
+
+	// Call the function to be tested
+	_, err := extractEmailDomain(invalidEmail)
+
+	if err == nil {
+		t.Errorf("Expected error for invalid email domain")
 	}
 }
 
